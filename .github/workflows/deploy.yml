@@ -10,29 +10,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 拉取你的 GitHub 代码
+      # 1. 拉取代码
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. 设置 Node.js 环境（已移除严格的锁文件缓存检查，彻底解决此报错）
+      # 2. 设置 Node 环境
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          # 💡 删除了 cache: 'npm' 这行，防止它因为找不到 package-lock.json 而崩溃
 
       # 3. 安装依赖
       - name: Install Dependencies
         run: npm install
 
-      # 4. 编译纯静态网页
+      # 4. 静态打包
       - name: Build Static Site
-        run: npm run build # 在根目录下生成编译后的 out/ 文件夹
+        run: npm run build
 
-      # 5. 使用 Mysten 官方专用的 Action 插件发布至 Walrus 主网
+      # 5. 官方插件一键推送
       - name: Deploy to Walrus Sites
-        uses: MystenLabs/walrus-sites-github-actions/deploy@main
+        uses: MystenLabs/walrus-sites-github-actions/deploy@v1
         with:
-          site-path: './out'
-          sui-private-key: ${{ secrets.SUI_PRIVATE_KEY }}
-          network: 'mainnet'
+          DIST: './out'                           # 静态资源目录
+          SUI_KEYSTORE: ${{ secrets.SUI_PRIVATE_KEY }} # 读取你的钱包私钥
+          SUI_NETWORK: mainnet                    # 锁定主网运行
