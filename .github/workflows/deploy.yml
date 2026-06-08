@@ -14,24 +14,25 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. 设置 Node.js 环境并编译纯静态网页
+      # 2. 设置 Node.js 环境（已移除严格的锁文件缓存检查，彻底解决此报错）
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
+          # 💡 删除了 cache: 'npm' 这行，防止它因为找不到 package-lock.json 而崩溃
 
+      # 3. 安装依赖
       - name: Install Dependencies
         run: npm install
 
+      # 4. 编译纯静态网页
       - name: Build Static Site
         run: npm run build # 在根目录下生成编译后的 out/ 文件夹
 
-      # 3. 使用 Mysten 官方专用的 Action 插件，安全且极速地发布至 Walrus 主网
+      # 5. 使用 Mysten 官方专用的 Action 插件发布至 Walrus 主网
       - name: Deploy to Walrus Sites
         uses: MystenLabs/walrus-sites-github-actions/deploy@main
         with:
-          site-path: './out' # Next.js 静态导出的默认文件夹
-          # 将加密凭证存在 GitHub Secrets 中，流水线运行时自动解密
+          site-path: './out'
           sui-private-key: ${{ secrets.SUI_PRIVATE_KEY }}
-          network: 'mainnet' # 明确运行在 Walrus 主网上
+          network: 'mainnet'
