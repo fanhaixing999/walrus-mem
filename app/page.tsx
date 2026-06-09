@@ -46,7 +46,7 @@ export default function WorldCupAgent() {
 
     let memoryContext = "暂无历史记忆。";
 
-    // MemWal 操作（异步，不阻塞大模型回复）
+    // MemWal 操作 - 异步不阻塞
     if (finalDelegate && finalAccount) {
       try {
         const client = MemWal.create({
@@ -56,14 +56,13 @@ export default function WorldCupAgent() {
           namespace: "worldcup-2026-agent",
         });
 
-        // 保存记忆 - 正确参数顺序
+        // 保存记忆（简化参数，避免类型错误）
         if (currentInput.trim().length > 5) {
           client.remember(
             `[User:${userId}] ${currentInput}`,
-            undefined,   // namespace
             {
               tags: ["worldcup", `user-${userId}`],
-              metadata: { timestamp: new Date().toISOString(), userId }
+              metadata: { timestamp: new Date().toISOString(), userId: userId }
             }
           ).catch(e => console.error("记忆保存失败:", e));
         }
@@ -78,7 +77,7 @@ export default function WorldCupAgent() {
 
           const memories = recallRes?.results || [];
           if (memories.length > 0) {
-            memoryContext = memories.map((m: any) => `- ${m.content || m.text}`).join("\n");
+            memoryContext = memories.map((m: any) => `- ${m.content || m.text || ''}`).join("\n");
           }
         } catch (e) {
           console.error("读取记忆失败:", e);
@@ -103,7 +102,7 @@ export default function WorldCupAgent() {
           messages: [
             {
               role: "system",
-              content: `你是世界杯记忆吐槽伙伴。历史记忆：\n${memoryContext}\n回复要幽默毒舌，像老球迷一样，并主动引用记忆。`
+              content: `你是世界杯记忆吐槽伙伴。历史记忆：\n${memoryContext}\n回复要幽默、毒舌，像老球迷，并主动引用记忆。`
             },
             ...newMessages
           ],
@@ -121,7 +120,7 @@ export default function WorldCupAgent() {
       console.error(err);
       setMessages([...newMessages, { 
         role: 'assistant', 
-        content: "大模型响应慢，但你的话已记录到 Walrus 主网！" 
+        content: "大模型响应较慢，但你的输入已成功记录到 Walrus 主网！" 
       }]);
     } finally {
       setIsLoading(false);
