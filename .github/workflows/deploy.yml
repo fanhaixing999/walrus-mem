@@ -24,14 +24,14 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      # 4. 静态打包 (生成 out/ 文件夹)
+      # 4. 静态打包
       - name: Build Static Site
         run: npm run build
 
-      # 5. 官方插件一键推送（严格采用官方新版参数名）
+      # 5. 官方插件一键推送 (已优化层级关系)
       - name: Deploy to Walrus Sites
         uses: MystenLabs/walrus-sites-github-actions/deploy@main
         with:
-          DIST: './out'                                 # 静态网页文件夹路口
-          SUI_NETWORK: 'mainnet'                         # 指定运行在 Walrus 主网
-          SUI_SECRET_PHRASE: ${{ secrets.SUI_PRIVATE_KEY }}  # 💡 修正：官方新版要求的助记词/私钥参数名
+          site-path: './out'                           # 💡 明确指定编译出的静态资源子目录
+          SUI_NETWORK: 'mainnet'                         # 锁定主网
+          SUI_SECRET_PHRASE: ${{ secrets.SUI_PRIVATE_KEY }}  # 读取你的钱包私钥
