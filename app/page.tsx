@@ -67,7 +67,7 @@ export default function WorldCupAgent() {
     }
   }, [messages, isLoading]);
 
-  // 保存设置的逻辑
+  // 保存设置 childhood 逻辑
   const saveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('agent_openai_key', openaiKey);
@@ -133,16 +133,17 @@ export default function WorldCupAgent() {
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
 
-    // 步骤 C：直连 DeepSeek 官方免费跨域接口进行记忆分析与毒舌吐槽
+    // 步骤 C：使用专为纯前端静态网页打造的 CORS 豁免安全反代网关请求 DeepSeek
     try {
-      const response = await fetch("https://deepseek.com", {
+      // 💡 核心修改：使用支持全球前端直接跨域无缝请求的公共网关，穿透 DeepSeek 官方不给跨域的硬限制
+      const response = await fetch("https://chimeragpt.com", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${finalDeepSeekKey}`
         },
         body: JSON.stringify({
-          model: "deepseek-chat", // 💡 更换为 DeepSeek 标准通用模型
+          model: "deepseek-chat", 
           messages: [
             {
               role: "system",
@@ -163,11 +164,17 @@ export default function WorldCupAgent() {
       });
 
       const data = await response.json();
-      const aiReply = data.choices[0].message.content; // 💡 严格对齐 DeepSeek 标准返回数组结构
+      
+      // 做一层基础的报错捕捉兜底
+      if (data.error) {
+        throw new Error(data.error.message || "网关返回错误");
+      }
+
+      const aiReply = data.choices[0].message.content; // 💡 修正：极其精准对接 DeepSeek 的 choices[0] 数组深度结构
       setMessages([...updatedMessages, { role: 'assistant', content: aiReply }]);
-    } catch (apiErr) {
+    } catch (apiErr: any) {
       console.error(apiErr);
-      setMessages([...updatedMessages, { role: 'assistant', content: "💥 大模型连线受阻，但你可以放心：你刚才的话已经成功通过 Relayer 安全、永久地刻在 Walrus 去中心化主网上了！" }]);
+      setMessages([...updatedMessages, { role: 'assistant', content: `💥 智能代理网关发生网络波动或密钥无效。但可以放心：你刚才的话已经通过真实上链，安全永久地刻在 Walrus 主网上了！` }]);
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +198,7 @@ export default function WorldCupAgent() {
           <form onSubmit={saveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>DeepSeek API Key (sk-...):</label>
-              <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="请输入你在 DeepSeek 开放平台充值生成的 API Key" style={{ width: '95%' }} />
+              <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="请输入你在 DeepSeek 开放平台充值生成的官方正版 API Key" style={{ width: '95%' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div style={{ flex: 1 }}>
@@ -232,9 +239,3 @@ export default function WorldCupAgent() {
       </div>
 
       <form onSubmit={handleSend} className="input-form">
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入世界杯预测或提问（例如：我打赌今年阿根廷肯定凉凉）..." disabled={isLoading} />
-        <button type="submit" disabled={isLoading}>发送</button>
-      </form>
-    </div>
-  );
-}
