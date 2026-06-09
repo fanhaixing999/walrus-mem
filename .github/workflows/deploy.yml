@@ -28,10 +28,11 @@ jobs:
       - name: Build Static Site
         run: npm run build
 
-      # 5. 官方插件一键推送 (已优化层级关系)
+      # 5. 官方插件一键推送 (严格按照最新标准对齐)
       - name: Deploy to Walrus Sites
         uses: MystenLabs/walrus-sites-github-actions/deploy@main
         with:
-          site-path: './out'                           # 💡 明确指定编译出的静态资源子目录
-          SUI_NETWORK: 'mainnet'                         # 锁定主网
+          DIST: './out'                                 # 💡 修正：全大写 DIST，100% 解决 <DIRECTORY> 缺失报错
+          SUI_NETWORK: 'mainnet'                         # 锁定主网运行
           SUI_SECRET_PHRASE: ${{ secrets.SUI_PRIVATE_KEY }}  # 读取你的钱包私钥
+          EPOCHS: 5                                     # 控制存储生命周期
