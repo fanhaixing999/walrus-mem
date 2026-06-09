@@ -11,7 +11,6 @@ export default function WorldCupAgent() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [memwalClient, setMemwalClient] = useState<any>(null);
   
-  // 环境变量与 API 配置相关状态
   const [deepseekKey, setDeepseekKey] = useState('');
   const [delegateKey, setDelegateKey] = useState('');
   const [accountId, setAccountId] = useState('');
@@ -19,7 +18,6 @@ export default function WorldCupAgent() {
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // 1. 初始化持久化用户 ID
   useEffect(() => {
     let savedId = localStorage.getItem('walrus_worldcup_user_id');
     if (!savedId) {
@@ -28,7 +26,6 @@ export default function WorldCupAgent() {
     }
     setUserId(savedId);
     
-    // 从本地存储中恢复参数，避免用户重复输入
     const savedDeepseek = localStorage.getItem('agent_deepseek_key');
     const savedDelegate = localStorage.getItem('agent_delegate_key');
     const savedAccount = localStorage.getItem('agent_account_id');
@@ -39,7 +36,6 @@ export default function WorldCupAgent() {
     setIsInitializing(false);
   }, []);
 
-  // 监听并实时建立 Walrus 主网连接
   useEffect(() => {
     const finalDelegate = delegateKey;
     const finalAccount = accountId;
@@ -60,14 +56,12 @@ export default function WorldCupAgent() {
     }
   }, [delegateKey, accountId]);
 
-  // 自动滚动到聊天底部
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
 
-  // 保存设置逻辑
   const saveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('agent_deepseek_key', deepseekKey);
@@ -76,7 +70,6 @@ export default function WorldCupAgent() {
     setShowConfig(false);
   };
 
-  // 2. 核心对话与去中心化记忆读写链路
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading || !userId) return;
@@ -104,7 +97,6 @@ export default function WorldCupAgent() {
     let memoryContext = "这是该用户在 Walrus 上的第一条历史预测，暂无历史记忆。";
 
     try {
-      // 步骤 A：将用户的新输入强阻塞同步写入 Walrus 去中心化主网
       if (userText.length > 5) {
         await memwalClient.rememberAndWait(`[User:${userId}] ${userText}`, {
           tags: ["worldcup", `user-${userId}`], 
@@ -112,7 +104,6 @@ export default function WorldCupAgent() {
         });
       }
 
-      // 步骤 B：从 Walrus 主网秒级召回当前用户历史发言
       const recallResponse = await memwalClient.recall({
         query: userText,
         limit: 5,
@@ -132,11 +123,14 @@ export default function WorldCupAgent() {
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
     
-    // 步骤 C：使用稳定的 CORS 代理调用 DeepSeek API
+    // ========== 关键修改：使用稳定的 CORS 代理调用 DeepSeek API ==========
     try {
+      // 直接使用 corsproxy.io 的正确语法（你原来写错了括号）
       const targetUrl = "https://api.deepseek.com/chat/completions";
-      const proxyUrl = `https://cors-proxy.htmldr.com/${targetUrl}`;
-
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      
+      console.log("正在通过代理调用 DeepSeek API...");
+      
       const response = await fetch(proxyUrl, {
         method: "POST",
         headers: {
@@ -159,6 +153,10 @@ export default function WorldCupAgent() {
           ]
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       const data = await response.json();
       
@@ -190,11 +188,11 @@ export default function WorldCupAgent() {
 
       {showConfig && (
         <div style={{ background: '#1e2937', border: '2px solid #22d3ee', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 15px 0', color: '#22d3ee' }}>🛠️ 智能体运行环境配置（评委测试 / 拥有者自用）</h3>
+          <h3 style={{ margin: '0 0 15px 0', color: '#22d3ee' }}>🛠️ 智能体运行环境配置</h3>
           <form onSubmit={saveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>DeepSeek API Key (sk-...):</label>
-              <input type="password" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} placeholder="请输入你在 DeepSeek 开放平台充值生成的官方正版 API Key" style={{ width: '95%' }} />
+              <input type="password" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} placeholder="请输入你的 DeepSeek API Key" style={{ width: '95%' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div style={{ flex: 1 }}>
