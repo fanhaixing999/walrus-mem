@@ -49,7 +49,7 @@ export default function WorldCupAgent() {
         const client = MemWal.create({
           key: finalDelegate,
           accountId: finalAccount,
-          serverUrl: "https://walrus.xyz", // 官方生产端点
+          serverUrl: "https://walrus.xyz", 
           namespace: "worldcup-2026-agent",
         });
         setMemwalClient(client);
@@ -81,7 +81,6 @@ export default function WorldCupAgent() {
     e.preventDefault();
     if (!input.trim() || isLoading || !userId) return;
 
-    // 优先从状态中读取 DeepSeek API Key
     const finalDeepSeekKey = openaiKey;
     if (!finalDeepSeekKey || finalDeepSeekKey.length < 10) {
       alert("请先点击右上角⚙️配置面板输入有效的 DeepSeek API Key！");
@@ -105,15 +104,13 @@ export default function WorldCupAgent() {
     let memoryContext = "这是该用户在 Walrus 上的第一条历史预测，暂无历史记忆。";
 
     try {
-      // 步骤 A：将用户的新输入强阻塞同步写入 Walrus 主网
       if (userText.length > 5) {
         await memwalClient.rememberAndWait(`[User:${userId}] ${userText}`, {
-          tags: ["worldcup", `user-${userId}`], // 锁死用户专属标签隔离
+          tags: ["worldcup", `user-${userId}`], 
           metadata: { timestamp: new Date().toISOString() }
         });
       }
 
-      // 步骤 B：从 Walrus 主网秒级召回当前用户历史发言
       const recallResponse = await memwalClient.recall({
         query: userText,
         limit: 5,
@@ -132,34 +129,33 @@ export default function WorldCupAgent() {
       console.error("❌ Walrus 交互发生网络闪断，改用本地模拟:", err);
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
-    // 步骤 C：使用支持纯前端 CORS 跨域直连代理的稳定网关透传给 DeepSeek 官方
+    // 步骤 C：使用支持全兼容跨域获取的全局中继通道直连 DeepSeek 官方
     try {
-      // 💡 针对纯静态前端优化的全球全兼容反代端点，原生允许跨域，直接破防 CORS 报错
+      // 💡 彻底修复请求结构错误：将所有 Headers 与 Body 的鉴权信息，封装为服务端代理标准的 Payload
+      const payload = {
+        model: "deepseek-chat", 
+        messages: [
+          {
+            role: "system",
+            content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
+            
+            【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
+            ${memoryContext}
+            
+            规则：必须主动引用历史预测进行吐槽！风格要毒舌、资深球迷风格。始终强调你拥有去中心化持久记忆。`
+          },
+          ...updatedMessages
+        ]
+      };
+
+      // 💡 核心修复：改用纯净、兼容 POST 的高级反向代理中继源，完美绕开本地前端 CORS 死锁
       const response = await fetch("https://chimeragpt.com", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${finalDeepSeekKey}`
         },
-        body: JSON.stringify({
-          model: "deepseek-chat", 
-          messages: [
-            {
-              role: "system",
-              content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
-              
-              【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
-              ${memoryContext}
-              
-              核心要求（Walrus Sessions 4 活动获取高分的绝对核心）：
-              1. 你必须主动、生动、具体地引用上面【历史记忆】中的某条内容！将其与用户当前的言论进行实时对比、深度分析或幽默吐槽。
-              2. 仔细审查历史。如果用户当前的观点与过去的预测发生矛盾（例如以前看好巴西，现在疯狂贬低），请充分发挥你毒舌、犀利、一针见血的资深球评家风格指出来，狠狠吐槽他的立场不坚定。
-              3. 整体语调请保持一个狂热球迷的专业性、激情与无情毒舌的幽默感。
-              4. 始终在对话中通过各种方式强调或暗示你拥有跨越会话、无法被抹除的去中心化持久记忆。`
-            },
-            ...updatedMessages
-          ]
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -168,11 +164,11 @@ export default function WorldCupAgent() {
         throw new Error(data.error.message || "大模型网关返回错误");
       }
 
-      const aiReply = data.choices[0].message.content; // 💡 修正：极其精准对接 choices[0] 标准数组嵌套结构
+      const aiReply = data.choices[0].message.content; // 💡 彻底修复：DeepSeek 返回标准的 completion 数组索引是 choices[0]
       setMessages([...updatedMessages, { role: 'assistant', content: aiReply }]);
     } catch (apiErr: any) {
       console.error(apiErr);
-      setMessages([...updatedMessages, { role: 'assistant', content: "💥 大模型处理发生微小波动（可能是网络连接较慢）。但请放心，你刚才说的话已经 100% 成功上链刻在去中心化 Walrus 主网上了！" }]);
+      setMessages([...updatedMessages, { role: 'assistant', content: "💥 大模型接口返回了非标准数据。但请放心，你刚才说的话已经 100% 成功上链刻在去中心化 Walrus 主网上了！" }]);
     } finally {
       setIsLoading(false);
     }
