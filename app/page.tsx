@@ -131,21 +131,16 @@ export default function WorldCupAgent() {
       console.error("❌ Walrus 交互发生网络闪断，改用本地模拟:", err);
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
-    // 步骤 C：使用 corsproxy.io 全球高性能通用反代通道无缝透传给 DeepSeek 官方
+    
+    // 步骤 C：通过 Next.js API 路由调用 DeepSeek（彻底解决 CORS）
     try {
-      const targetUrl = "https://deepseek.com";
-      
-      // 💡 采用万能 Query 反代拼接，彻底消灭控制台红色 openai.com CORS 错误
-      const proxyUrl = `https://corsproxy.io{encodeURIComponent(targetUrl)}`;
-
-      const response = await fetch(proxyUrl, {
-        method: "POST",
+      const response = await fetch('/api/chat', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${finalDeepSeekKey}`
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "deepseek-chat", 
+          apiKey: finalDeepSeekKey,
           messages: [
             {
               role: "system",
@@ -164,7 +159,7 @@ export default function WorldCupAgent() {
       const data = await response.json();
       
       if (data.error) {
-        throw new Error(data.error.message || "大模型网关返回错误");
+        throw new Error(typeof data.error === 'string' ? data.error : data.error.message || "大模型网关返回错误");
       }
 
       // 精准提取 DeepSeek 模型返回的文本数据
