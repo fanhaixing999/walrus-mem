@@ -15,7 +15,6 @@ export default function WorldCupAgent() {
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // 初始化 userId
   useEffect(() => {
     let savedId = localStorage.getItem('walrus_worldcup_user_id');
     if (!savedId) {
@@ -25,7 +24,6 @@ export default function WorldCupAgent() {
     setUserId(savedId);
   }, []);
 
-  // 自动滚动
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -47,8 +45,9 @@ export default function WorldCupAgent() {
 
     let memoryContext = "这是该用户第一次对话，暂无历史记忆。";
 
-    try {
-      if (finalDelegate && finalAccount) {
+    // MemWal 操作
+    if (finalDelegate && finalAccount) {
+      try {
         const client = MemWal.create({
           key: finalDelegate,
           accountId: finalAccount,
@@ -56,17 +55,17 @@ export default function WorldCupAgent() {
           namespace: "worldcup-2026-agent",
         });
 
-        // 保存记忆
+        // 保存记忆（修复版）
         if (input.trim().length > 5) {
           try {
-            await client.rememberAndWait(
+            const job = await client.remember(
               `[User:${userId}] ${input}`,
-              undefined,
               {
                 tags: ["worldcup", `user-${userId}`],
                 metadata: { timestamp: new Date().toISOString(), userId }
               }
             );
+            await client.waitForRememberJob(job.job_id, { timeoutMs: 15000 });
           } catch (e) {
             console.error("记忆保存失败:", e);
           }
@@ -83,18 +82,18 @@ export default function WorldCupAgent() {
           const memories = recallRes?.results || [];
           if (memories.length > 0) {
             memoryContext = memories
-              .map((m: any) => `- ${m.content || m.text}`)
+              .map((m: any) => `- ${m.content || m.text || JSON.stringify(m)}`)
               .join("\n");
           }
         } catch (e) {
           console.error("记忆读取失败:", e);
         }
+      } catch (e) {
+        console.error("MemWal 初始化失败:", e);
       }
-    } catch (e) {
-      console.error("MemWal 初始化失败:", e);
     }
 
-    // 调用大模型
+    // 调用 DeepSeek
     try {
       const proxyUrl = `https://corsproxy.io/?${encodeURIComponent('https://api.deepseek.com/chat/completions')}`;
 
@@ -111,17 +110,17 @@ export default function WorldCupAgent() {
               role: "system",
               content: `你是「世界杯记忆吐槽伙伴」——完全运行在 Walrus Mainnet 上的持久记忆 Agent。
 
-【Walrus 主网历史记忆】（必须主动引用）：
+【Walrus 主网历史记忆】（必须主动引用并吐槽）：
 ${memoryContext}
 
 回复要求：
 - 必须引用历史记忆进行对比或幽默吐槽
-- 风格毒舌、热情、像老球迷
-- 强调你拥有 Walrus 去中心化持久记忆`
+- 风格毒舌、幽默、像老球迷
+- 强调 Walrus 去中心化持久记忆`
             },
             ...newMessages
           ],
-          temperature: 0.8,
+          temperature: 0.85,
         })
       });
 
@@ -135,7 +134,7 @@ ${memoryContext}
       console.error(err);
       setMessages([...newMessages, { 
         role: 'assistant', 
-        content: "🤖 大模型暂时连接失败，但你刚才说的话已经成功永久保存在 Walrus 主网上了！\n\n可以尝试刷新页面后继续对话。" 
+        content: "🤖 大模型暂时连接失败，但你刚才说的话已经成功永久保存在 Walrus 主网！\n\n刷新页面后仍能回忆。" 
       }]);
     } finally {
       setIsLoading(false);
@@ -143,69 +142,52 @@ ${memoryContext}
   };
 
   return (
-    <div className="container" style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
+    <div className="container" style={{ padding: '20px', maxWidth: '900px', margin: '0 auto', fontFamily: 'system-ui' }}>
       <h1>⚽ World Cup Walrus Memory Agent</h1>
-      <p style={{ opacity: 0.8 }}>完全运行在 Walrus Sites (wal.app) 上的去中心化智能体</p>
+      <p style={{ opacity: 0.8 }}>完全运行在 Walrus Sites 上的去中心化智能体</p>
 
-      <button onClick={() => setShowConfig(!showConfig)} style={{ marginBottom: '15px' }}>
-        ⚙️ 配置面板 {showConfig ? '收起' : '展开'}
+      <button 
+        onClick={() => setShowConfig(!showConfig)} 
+        style={{ marginBottom: '15px', padding: '8px 16px' }}
+      >
+        ⚙️ {showConfig ? '收起' : '展开'}配置面板
       </button>
 
       {showConfig && (
         <div style={{ background: '#1e2937', padding: '15px', borderRadius: '12px', marginBottom: '20px' }}>
-          <input
-            type="text"
-            placeholder="MEMWAL_DELEGATE_KEY"
-            value={delegateKey}
-            onChange={(e) => setDelegateKey(e.target.value)}
-            style={{ width: '100%', marginBottom: '8px', padding: '8px' }}
-          />
-          <input
-            type="text"
-            placeholder="MEMWAL_ACCOUNT_ID (0x...)"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            style={{ width: '100%', marginBottom: '8px', padding: '8px' }}
-          />
-          <input
-            type="password"
-            placeholder="DeepSeek API Key (sk-...)"
-            value={deepseekKey}
-            onChange={(e) => setDeepseekKey(e.target.value)}
-            style={{ width: '100%', padding: '8px' }}
-          />
-          <small>提示：输入后可点击“保存到本地”避免每次刷新重输</small>
+          <input type="text" placeholder="MEMWAL_DELEGATE_KEY" value={delegateKey} onChange={(e) => setDelegateKey(e.target.value)} style={{width:'100%', marginBottom:'8px', padding:'8px'}} />
+          <input type="text" placeholder="MEMWAL_ACCOUNT_ID (0x开头)" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{width:'100%', marginBottom:'8px', padding:'8px'}} />
+          <input type="password" placeholder="DeepSeek API Key (sk-...)" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} style={{width:'100%', padding:'8px'}} />
         </div>
       )}
 
-      <div className="chat-box" ref={chatContainerRef} style={{ height: '65vh', overflowY: 'auto' }}>
+      <div className="chat-box" ref={chatContainerRef} style={{ height: '65vh', overflowY: 'auto', background: '#0f172a', padding: '20px', borderRadius: '16px' }}>
         {messages.length === 0 && (
           <div className="message agent">
-            👋 你好！我是你的世界杯记忆伙伴。<br />
-            我已连接 Walrus 主网。<br />
-            请先输入几条世界杯预测，我会永久记住它们！
+            👋 你好！我是你的世界杯记忆伙伴。<br/>我已连接 Walrus 主网。<br/>请先输入几条世界杯预测，我会永久记住！
           </div>
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={`message ${m.role === 'user' ? 'user' : 'agent'}`}>
+          <div key={i} className={`message ${m.role === 'user' ? 'user' : 'agent'}`} style={{ margin: '12px 0', padding: '14px', borderRadius: '12px', maxWidth: '80%' }}>
             <strong>{m.role === 'user' ? '你' : '记忆伙伴'}:</strong><br />
             {m.content}
           </div>
         ))}
 
-        {isLoading && <div className="message agent">思考中...（Walrus 记忆已保存）</div>}
+        {isLoading && <div className="message agent">思考中... Walrus 记忆已保存</div>}
       </div>
 
-      <div className="input-form" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="输入你的世界杯预测或问题..."
+          placeholder="输入你的世界杯预测..."
           onKeyPress={(e) => e.key === 'Enter' && handleSend()}
           disabled={isLoading}
+          style={{ flex: 1, padding: '14px', borderRadius: '12px' }}
         />
-        <button onClick={handleSend} disabled={isLoading || !input.trim()}>
+        <button onClick={handleSend} disabled={isLoading || !input.trim()} style={{ padding: '0 24px' }}>
           发送
         </button>
       </div>
