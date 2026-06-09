@@ -28,7 +28,7 @@ jobs:
       - name: Build Static Site
         run: npm run build
 
-      # 5. 官方插件一键推送 (已锁定超低 Epoch 扣费门槛)
+      # 5. 官方插件一键推送 (已锁定超低 Epoch)
       - name: Deploy to Walrus Sites
         uses: MystenLabs/walrus-sites-github-actions/deploy@main
         with:
