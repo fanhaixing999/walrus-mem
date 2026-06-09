@@ -1,0 +1,6 @@
+{
+  "public_id": "worldcup-walrus-memory-agent",
+  "routes": {
+    "/": "index.html"
+  }
+}
