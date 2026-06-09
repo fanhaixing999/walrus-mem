@@ -132,36 +132,44 @@ export default function WorldCupAgent() {
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
     
-    // 步骤 C：使用 DeepSeek 官方浏览器 SDK（原生支持 CORS）
+    // 步骤 C：使用稳定的 CORS 代理调用 DeepSeek API
     try {
-      // 动态导入 SDK，避免服务端渲染问题
-      const { DeepSeekClient } = await import('@deepseek-ai/sdk');
+      const targetUrl = "https://api.deepseek.com/chat/completions";
+      const proxyUrl = `https://cors-proxy.htmldr.com/${targetUrl}`;
+
+      const response = await fetch(proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${finalDeepSeekKey}`
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat", 
+          messages: [
+            {
+              role: "system",
+              content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
+              
+              【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
+              ${memoryContext}
+              
+              规则：必须主动引用历史预测进行吐槽！风格要毒舌、资深球迷风格。始终强调你拥有去中心化持久记忆。`
+            },
+            ...updatedMessages
+          ]
+        })
+      });
+
+      const data = await response.json();
       
-      const client = new DeepSeekClient({
-        apiKey: finalDeepSeekKey,
-        dangerouslyAllowBrowser: true  // 明确允许浏览器环境使用
-      });
+      if (data.error) {
+        throw new Error(data.error.message || "大模型网关返回错误");
+      }
 
-      const response = await client.chat.completions.create({
-        model: "deepseek-chat",
-        messages: [
-          {
-            role: "system",
-            content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
-            
-            【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
-            ${memoryContext}
-            
-            规则：必须主动引用历史预测进行吐槽！风格要毒舌、资深球迷风格。始终强调你拥有去中心化持久记忆。`
-          },
-          ...updatedMessages
-        ]
-      });
-
-      const aiReply = response.choices[0].message.content; 
+      const aiReply = data.choices[0].message.content; 
       setMessages([...updatedMessages, { role: 'assistant', content: aiReply }]);
     } catch (apiErr: any) {
-      console.error("DeepSeek SDK 调用失败:", apiErr);
+      console.error("API 调用失败:", apiErr);
       setMessages([...updatedMessages, { role: 'assistant', content: "🤖 大模型连线受阻，但你可以放心：你刚才说的话已经通过 Relayer 安全、永久地刻在去中心化 Walrus 主网上了！" }]);
     } finally {
       setIsLoading(false);
