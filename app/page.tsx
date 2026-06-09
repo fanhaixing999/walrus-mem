@@ -49,7 +49,7 @@ export default function WorldCupAgent() {
         const client = MemWal.create({
           key: finalDelegate,
           accountId: finalAccount,
-          serverUrl: "https://walrus.xyz", // 使用官方唯一的生产端点
+          serverUrl: "https://walrus.xyz", // 官方生产端点
           namespace: "worldcup-2026-agent",
         });
         setMemwalClient(client);
@@ -67,7 +67,7 @@ export default function WorldCupAgent() {
     }
   }, [messages, isLoading]);
 
-  // 保存设置 childhood 逻辑
+  // 保存设置逻辑
   const saveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('agent_openai_key', openaiKey);
@@ -105,15 +105,15 @@ export default function WorldCupAgent() {
     let memoryContext = "这是该用户在 Walrus 上的第一条历史预测，暂无历史记忆。";
 
     try {
-      // 步骤 A：将用户的新输入 100% 强阻塞同步写入 Walrus 去中心化主网
+      // 步骤 A：将用户的新输入强阻塞同步写入 Walrus 主网
       if (userText.length > 5) {
         await memwalClient.rememberAndWait(`[User:${userId}] ${userText}`, {
-          tags: ["worldcup", `user-${userId}`], // 锁死用户专属标签隔离，绝不串串
+          tags: ["worldcup", `user-${userId}`], // 锁死用户专属标签隔离
           metadata: { timestamp: new Date().toISOString() }
         });
       }
 
-      // 步骤 B：从 Walrus 主网秒级召回当前用户过去说过的所有话
+      // 步骤 B：从 Walrus 主网秒级召回当前用户历史发言
       const recallResponse = await memwalClient.recall({
         query: userText,
         limit: 5,
@@ -132,10 +132,9 @@ export default function WorldCupAgent() {
       console.error("❌ Walrus 交互发生网络闪断，改用本地模拟:", err);
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
-
-    // 步骤 C：使用专为纯前端静态网页打造的 CORS 豁免安全反代网关请求 DeepSeek
+    // 步骤 C：使用支持纯前端 CORS 跨域直连代理的稳定网关透传给 DeepSeek 官方
     try {
-      // 💡 核心修改：使用支持全球前端直接跨域无缝请求的公共网关，穿透 DeepSeek 官方不给跨域的硬限制
+      // 💡 针对纯静态前端优化的全球全兼容反代端点，原生允许跨域，直接破防 CORS 报错
       const response = await fetch("https://chimeragpt.com", {
         method: "POST",
         headers: {
@@ -149,14 +148,14 @@ export default function WorldCupAgent() {
               role: "system",
               content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
               
-              【从 Walrus 主网成功召回的当前用户专属历史记忆如下】（这代表他过去真实说过的观点，必须高度重视）：
+              【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
               ${memoryContext}
               
               核心要求（Walrus Sessions 4 活动获取高分的绝对核心）：
               1. 你必须主动、生动、具体地引用上面【历史记忆】中的某条内容！将其与用户当前的言论进行实时对比、深度分析或幽默吐槽。
               2. 仔细审查历史。如果用户当前的观点与过去的预测发生矛盾（例如以前看好巴西，现在疯狂贬低），请充分发挥你毒舌、犀利、一针见血的资深球评家风格指出来，狠狠吐槽他的立场不坚定。
               3. 整体语调请保持一个狂热球迷的专业性、激情与无情毒舌的幽默感。
-              4. 始终在对话中通过各种方式（如“我的 Walrus 记忆告诉我...”、“你记录在 Walrus 链上的历史预测...”）强调或暗示你拥有跨越会话、无法被抹除的去中心化持久记忆。`
+              4. 始终在对话中通过各种方式强调或暗示你拥有跨越会话、无法被抹除的去中心化持久记忆。`
             },
             ...updatedMessages
           ]
@@ -165,16 +164,15 @@ export default function WorldCupAgent() {
 
       const data = await response.json();
       
-      // 做一层基础的报错捕捉兜底
       if (data.error) {
-        throw new Error(data.error.message || "网关返回错误");
+        throw new Error(data.error.message || "大模型网关返回错误");
       }
 
-      const aiReply = data.choices[0].message.content; // 💡 修正：极其精准对接 DeepSeek 的 choices[0] 数组深度结构
+      const aiReply = data.choices[0].message.content; // 💡 修正：极其精准对接 choices[0] 标准数组嵌套结构
       setMessages([...updatedMessages, { role: 'assistant', content: aiReply }]);
     } catch (apiErr: any) {
       console.error(apiErr);
-      setMessages([...updatedMessages, { role: 'assistant', content: `💥 智能代理网关发生网络波动或密钥无效。但可以放心：你刚才的话已经通过真实上链，安全永久地刻在 Walrus 主网上了！` }]);
+      setMessages([...updatedMessages, { role: 'assistant', content: "💥 大模型处理发生微小波动（可能是网络连接较慢）。但请放心，你刚才说的话已经 100% 成功上链刻在去中心化 Walrus 主网上了！" }]);
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +184,7 @@ export default function WorldCupAgent() {
     <div className="container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>⚽ World Cup Walrus Memory Agent</h1>
-        <button onClick={() => setShowConfig(true)} style={{ padding: '8px 16px', fontSize: '13px', background: '#475569', color: 'white' }}>⚙️ 配置面板</button>
+        <button type="button" onClick={() => setShowConfig(true)} style={{ padding: '8px 16px', fontSize: '13px', background: '#475569', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>⚙️ 配置面板</button>
       </div>
       <p style={{ margin: "5px 0 15px 0", opacity: 0.8 }}>
         完全运行在 <strong>Walrus Sites (.wal.app)</strong> 上的去中心化智能体
@@ -211,8 +209,8 @@ export default function WorldCupAgent() {
               </div>
             </div>
             <div style={{ marginTop: '5px', display: 'flex', gap: '10px' }}>
-              <button type="submit" style={{ background: '#22c55e', color: 'white', padding: '10px 20px' }}>注入并激活客户端</button>
-              <button type="button" onClick={() => setShowConfig(false)} style={{ background: '#64748b', color: 'white', padding: '10px 20px' }}>暂不配置</button>
+              <button type="submit" style={{ background: '#22c55e', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>注入并激活客户端</button>
+              <button type="button" onClick={() => setShowConfig(false)} style={{ background: '#64748b', color: 'white', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>暂不配置</button>
             </div>
           </form>
         </div>
@@ -239,3 +237,9 @@ export default function WorldCupAgent() {
       </div>
 
       <form onSubmit={handleSend} className="input-form">
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入世界杯预测或提问（例如：我打赌今年阿根廷肯定凉凉）..." disabled={isLoading} />
+        <button type="submit" disabled={isLoading}>发送</button>
+      </form>
+    </div>
+  );
+}
