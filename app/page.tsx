@@ -12,7 +12,7 @@ export default function WorldCupAgent() {
   const [memwalClient, setMemwalClient] = useState<any>(null);
   
   // 环境变量与 API 配置相关状态
-  const [openaiKey, setOpenaiKey] = useState('');
+  const [deepseekKey, setDeepseekKey] = useState('');
   const [delegateKey, setDelegateKey] = useState('');
   const [accountId, setAccountId] = useState('');
   const [showConfig, setShowConfig] = useState(true);
@@ -29,10 +29,10 @@ export default function WorldCupAgent() {
     setUserId(savedId);
     
     // 从本地存储中恢复参数，避免用户重复输入
-    const savedOpenai = localStorage.getItem('agent_openai_key');
+    const savedDeepseek = localStorage.getItem('agent_deepseek_key');
     const savedDelegate = localStorage.getItem('agent_delegate_key');
     const savedAccount = localStorage.getItem('agent_account_id');
-    if (savedOpenai) setOpenaiKey(savedOpenai);
+    if (savedDeepseek) setDeepseekKey(savedDeepseek);
     if (savedDelegate) setDelegateKey(savedDelegate);
     if (savedAccount) setAccountId(savedAccount);
 
@@ -49,7 +49,7 @@ export default function WorldCupAgent() {
         const client = MemWal.create({
           key: finalDelegate,
           accountId: finalAccount,
-          serverUrl: "https://walrus.xyz", // 官方主网生产端点
+          serverUrl: "https://walrus.xyz",
           namespace: "worldcup-2026-agent",
         });
         setMemwalClient(client);
@@ -70,7 +70,7 @@ export default function WorldCupAgent() {
   // 保存设置逻辑
   const saveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('agent_openai_key', openaiKey);
+    localStorage.setItem('agent_deepseek_key', deepseekKey);
     localStorage.setItem('agent_delegate_key', delegateKey);
     localStorage.setItem('agent_account_id', accountId);
     setShowConfig(false);
@@ -81,7 +81,7 @@ export default function WorldCupAgent() {
     e.preventDefault();
     if (!input.trim() || isLoading || !userId) return;
 
-    const finalDeepSeekKey = openaiKey;
+    const finalDeepSeekKey = deepseekKey;
     if (!finalDeepSeekKey || finalDeepSeekKey.length < 10) {
       alert("请先点击右上角⚙️配置面板输入有效的 DeepSeek API Key！");
       setShowConfig(true);
@@ -132,41 +132,36 @@ export default function WorldCupAgent() {
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
     
-    // 步骤 C：通过 Next.js API 路由调用 DeepSeek（彻底解决 CORS）
+    // 步骤 C：使用 DeepSeek 官方浏览器 SDK（原生支持 CORS）
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey: finalDeepSeekKey,
-          messages: [
-            {
-              role: "system",
-              content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
-              
-              【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
-              ${memoryContext}
-              
-              规则：必须主动引用历史预测进行吐槽！风格要毒舌、资深球迷风格。始终强调你拥有去中心化持久记忆。`
-            },
-            ...updatedMessages
-          ]
-        })
+      // 动态导入 SDK，避免服务端渲染问题
+      const { DeepSeekClient } = await import('@deepseek-ai/sdk');
+      
+      const client = new DeepSeekClient({
+        apiKey: finalDeepSeekKey,
+        dangerouslyAllowBrowser: true  // 明确允许浏览器环境使用
       });
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(typeof data.error === 'string' ? data.error : data.error.message || "大模型网关返回错误");
-      }
+      const response = await client.chat.completions.create({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
+            
+            【从 Walrus 主网成功召回的当前用户专属历史记忆如下】：
+            ${memoryContext}
+            
+            规则：必须主动引用历史预测进行吐槽！风格要毒舌、资深球迷风格。始终强调你拥有去中心化持久记忆。`
+          },
+          ...updatedMessages
+        ]
+      });
 
-      // 精准提取 DeepSeek 模型返回的文本数据
-      const aiReply = data.choices[0].message.content; 
+      const aiReply = response.choices[0].message.content; 
       setMessages([...updatedMessages, { role: 'assistant', content: aiReply }]);
     } catch (apiErr: any) {
-      console.error(apiErr);
+      console.error("DeepSeek SDK 调用失败:", apiErr);
       setMessages([...updatedMessages, { role: 'assistant', content: "🤖 大模型连线受阻，但你可以放心：你刚才说的话已经通过 Relayer 安全、永久地刻在去中心化 Walrus 主网上了！" }]);
     } finally {
       setIsLoading(false);
@@ -191,7 +186,7 @@ export default function WorldCupAgent() {
           <form onSubmit={saveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>DeepSeek API Key (sk-...):</label>
-              <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="请输入你在 DeepSeek 开放平台充值生成的官方正版 API Key" style={{ width: '95%' }} />
+              <input type="password" value={deepseekKey} onChange={(e) => setDeepseekKey(e.target.value)} placeholder="请输入你在 DeepSeek 开放平台充值生成的官方正版 API Key" style={{ width: '95%' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div style={{ flex: 1 }}>
