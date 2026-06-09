@@ -11,7 +11,7 @@ export default function WorldCupAgent() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [memwalClient, setMemwalClient] = useState<any>(null);
   
-  // 环境变量与 API 配置相关状态（支持界面上自定义，更安全、更极客）
+  // 环境变量与 API 配置相关状态
   const [openaiKey, setOpenaiKey] = useState('');
   const [delegateKey, setDelegateKey] = useState('');
   const [accountId, setAccountId] = useState('');
@@ -28,7 +28,7 @@ export default function WorldCupAgent() {
     }
     setUserId(savedId);
     
-    // 尝试从本地持久化中恢复评委或你之前填过的 Key，避免重复输入
+    // 从本地持久化中恢复参数，避免重复输入
     const savedOpenai = localStorage.getItem('agent_openai_key');
     const savedDelegate = localStorage.getItem('agent_delegate_key');
     const savedAccount = localStorage.getItem('agent_account_id');
@@ -41,16 +41,15 @@ export default function WorldCupAgent() {
 
   // 监听并实时建立 Walrus 主网连接
   useEffect(() => {
-    // 允许在这里硬编码兜底配置，如果界面不输就走这里的硬编码（方便测试）
-    const finalDelegate = delegateKey || "你的主网DELEGATE私钥（或留空让页面上输）";
-    const finalAccount = accountId || "你的主网ACCOUNT_ID（或留空让页面上输）";
+    const finalDelegate = delegateKey;
+    const finalAccount = accountId;
 
     if (finalDelegate && finalAccount && finalAccount.startsWith('0x')) {
       try {
         const client = MemWal.create({
           key: finalDelegate,
           accountId: finalAccount,
-          serverUrl: "https://relayer.memory.walrus.xyz", // 修正：使用官方唯一的生产端点
+          serverUrl: "https://walrus.xyz", // 使用官方唯一的生产端点
           namespace: "worldcup-2026-agent",
         });
         setMemwalClient(client);
@@ -82,10 +81,10 @@ export default function WorldCupAgent() {
     e.preventDefault();
     if (!input.trim() || isLoading || !userId) return;
 
-    // 优先从状态或插槽中读取 OpenAI Key
-    const finalOpenAIKey = openaiKey || "你的硬编码OpenAI_Key（非必须，页面可输入）";
-    if (!finalOpenAIKey || finalOpenAIKey.length < 10) {
-      alert("请先点击右上角⚙️配置面板输入有效的 OpenAI API Key！");
+    // 优先从状态中读取 DeepSeek API Key
+    const finalDeepSeekKey = openaiKey;
+    if (!finalDeepSeekKey || finalDeepSeekKey.length < 10) {
+      alert("请先点击右上角⚙️配置面板输入有效的 DeepSeek API Key！");
       setShowConfig(true);
       return;
     }
@@ -134,28 +133,29 @@ export default function WorldCupAgent() {
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
 
-    // 步骤 C：直连大模型进行记忆分析与毒舌吐槽
+    // 步骤 C：直连 DeepSeek 官方免费跨域接口进行记忆分析与毒舌吐槽
     try {
-      const response = await fetch("https://openai.com", {
+      const response = await fetch("https://deepseek.com", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${finalOpenAIKey}`
+          "Authorization": `Bearer ${finalDeepSeekKey}`
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "deepseek-chat", // 💡 更换为 DeepSeek 标准通用模型
           messages: [
             {
               role: "system",
               content: `你是「世界杯记忆吐槽伙伴」——一个真正完全部署在去中心化存储网络 Walrus Mainnet 上的持久记忆 AI Agent。
               
-              【从 Walrus 主网召回的当前用户专属历史记忆如下】：
+              【从 Walrus 主网成功召回的当前用户专属历史记忆如下】（这代表他过去真实说过的观点，必须高度重视）：
               ${memoryContext}
               
-              核心要求（Walrus Sessions 4 评分重点）：
-              1. 必须主动、生动、具体地引用上面【历史记忆】中的某条内容！将其与用户当前的言论进行实时对比、深度分析或幽默吐槽。
-              2. 仔细审查历史。如果用户当前的观点与过去的预测发生矛盾（例如以前看好巴西，现在疯狂贬低），请充分发挥你毒舌、犀利、一针见血的资深球评家风格指出来，狠狠吐槽。
-              3. 始终在对话中通过各种方式（如“我的 Walrus 记忆告诉我...”、“你记录在 Walrus 链上的历史预测...”）强调或暗示你拥有跨越会话、无法被抹除的去中心化持久记忆。`
+              核心要求（Walrus Sessions 4 活动获取高分的绝对核心）：
+              1. 你必须主动、生动、具体地引用上面【历史记忆】中的某条内容！将其与用户当前的言论进行实时对比、深度分析或幽默吐槽。
+              2. 仔细审查历史。如果用户当前的观点与过去的预测发生矛盾（例如以前看好巴西，现在疯狂贬低），请充分发挥你毒舌、犀利、一针见血的资深球评家风格指出来，狠狠吐槽他的立场不坚定。
+              3. 整体语调请保持一个狂热球迷的专业性、激情与无情毒舌的幽默感。
+              4. 始终在对话中通过各种方式（如“我的 Walrus 记忆告诉我...”、“你记录在 Walrus 链上的历史预测...”）强调或暗示你拥有跨越会话、无法被抹除的去中心化持久记忆。`
             },
             ...updatedMessages
           ]
@@ -163,7 +163,7 @@ export default function WorldCupAgent() {
       });
 
       const data = await response.json();
-      const aiReply = data.choices[0].message.content;
+      const aiReply = data.choices[0].message.content; // 💡 严格对齐 DeepSeek 标准返回数组结构
       setMessages([...updatedMessages, { role: 'assistant', content: aiReply }]);
     } catch (apiErr) {
       console.error(apiErr);
@@ -190,8 +190,8 @@ export default function WorldCupAgent() {
           <h3 style={{ margin: '0 0 15px 0', color: '#22d3ee' }}>🛠️ 智能体运行环境配置（评委测试 / 拥有者自用）</h3>
           <form onSubmit={saveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>OpenAI API Key (sk-...):</label>
-              <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="如果你已经在代码中硬编码了，这里可以留空" style={{ width: '95%' }} />
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px' }}>DeepSeek API Key (sk-...):</label>
+              <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="请输入你在 DeepSeek 开放平台充值生成的 API Key" style={{ width: '95%' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div style={{ flex: 1 }}>
