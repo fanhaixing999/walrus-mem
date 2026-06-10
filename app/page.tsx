@@ -123,22 +123,19 @@ export default function WorldCupAgent() {
       memoryContext = "由于主网中继波动，暂未能成功取出旧记忆上下文。";
     }
     
-    // ========== 关键修改：使用稳定的 CORS 代理调用 DeepSeek API ==========
+    // ========== 步骤 C：通过你的 Vercel 代理调用 DeepSeek API ==========
     try {
-      // 直接使用 corsproxy.io 的正确语法（你原来写错了括号）
-      const targetUrl = "https://api.deepseek.com/chat/completions";
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      // 你的 Vercel 代理地址（环境变量已配置在 Vercel 上）
+      const proxyUrl = 'https://walrus-mem.vercel.app/api/proxy';
       
-      console.log("正在通过代理调用 DeepSeek API...");
+      console.log("正在通过 Vercel 代理调用 DeepSeek API...");
       
       const response = await fetch(proxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${finalDeepSeekKey}`
         },
         body: JSON.stringify({
-          model: "deepseek-chat", 
           messages: [
             {
               role: "system",
@@ -155,7 +152,8 @@ export default function WorldCupAgent() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
